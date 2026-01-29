@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Mailto Link App",
-  description: "Dynamic mailto logger",
+  title: "Mailto Link Logger",
+  description: "Dynamic mailto link generator with Supabase logging",
 };
 
 export default function RootLayout({
