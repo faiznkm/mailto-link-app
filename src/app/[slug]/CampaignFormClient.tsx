@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 export default function CampaignFormClient({
   campaign,
@@ -11,32 +12,74 @@ export default function CampaignFormClient({
   const [place, setPlace] = useState("");
   const [email, setEmail] = useState("");
 
+  // ✅ Visitor UUID (generated once)
+  const [visitorId, setVisitorId] = useState("");
+
+  // ✅ Metadata States
+  const [platform, setPlatform] = useState("unknown");
+  const [deviceType, setDeviceType] = useState("unknown");
+  const [screenWidth, setScreenWidth] = useState<number | null>(null);
+  const [screenHeight, setScreenHeight] = useState<number | null>(null);
+  const [language, setLanguage] = useState("unknown");
+  const [referrer, setReferrer] = useState("direct");
+
   // ✅ Email error state
   const [emailError, setEmailError] = useState("");
 
   // ✅ One Source of Truth Email Regex
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  // ✅ Collect browser metadata once
+  useEffect(() => {
+    setVisitorId(uuidv4());
+
+    setPlatform(navigator.platform || "unknown");
+    setLanguage(navigator.language || "unknown");
+
+    setScreenWidth(window.screen.width);
+    setScreenHeight(window.screen.height);
+
+    setReferrer(document.referrer || "direct");
+
+    // ✅ userAgentData (Chrome only)
+    const uaData = (navigator as any).userAgentData;
+    if (uaData) {
+      setDeviceType(uaData.mobile ? "Mobile" : "Desktop");
+    } else {
+      // fallback using userAgent string
+      setDeviceType(/mobile/i.test(navigator.userAgent) ? "Mobile" : "Desktop");
+    }
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // Block submission if invalid email
+    // ✅ Block submission if invalid email
     if (!emailRegex.test(email)) {
       setEmailError("Enter a valid email like name@gmail.com");
       return;
     }
 
-    // Log request into Supabase
+    // ✅ Log request into Supabase with metadata
     const res = await fetch("/api/log-request", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        campaign_id: campaign.id,
         name,
         place,
         email,
-        campaign_id: campaign.id,
+
+        // ✅ Extra Metadata
+        visitor_id: visitorId,
+        platform,
+        device_type: deviceType,
+        screen_width: screenWidth,
+        screen_height: screenHeight,
+        language,
+        referrer,
       }),
     });
 
@@ -45,12 +88,10 @@ export default function CampaignFormClient({
       return;
     }
 
-    // ✅ Beautified Email Subject
-    const subject = encodeURIComponent(
-        `${campaign.subject} - From ${name}`
-      );
+    // ✅ Email Subject
+    const subject = encodeURIComponent(`${campaign.subject} - From ${name}`);
 
-      // ✅ Beautified Email Body Template
+    // ✅ Email Body Template
     const bodyText = encodeURIComponent(
       `${campaign.body}\n\n\n` +
         `Name: ${name}\n` +
@@ -58,8 +99,7 @@ export default function CampaignFormClient({
         `Email: ${email}\n`
     );
 
-
-    // Open mail app
+    // ✅ Open Mail App
     window.location.href =
       `mailto:${campaign.to_email}` +
       `?subject=${subject}` +
@@ -106,9 +146,7 @@ export default function CampaignFormClient({
       />
 
       {/* Live Email Error */}
-      {emailError && (
-        <p style={styles.error}>{emailError}</p>
-      )}
+      {emailError && <p style={styles.error}>{emailError}</p>}
 
       {/* Submit */}
       <button

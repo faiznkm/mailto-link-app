@@ -1,9 +1,41 @@
 import { supabaseServer } from "../../../lib/supabaseServer";
 
+/* ✅ Detect Browser */
+function detectBrowser(ua: string) {
+  if (ua.includes("Edg")) return "Edge";
+  if (ua.includes("Chrome")) return "Chrome";
+  if (ua.includes("Firefox")) return "Firefox";
+  if (ua.includes("Safari")) return "Safari";
+  return "Unknown";
+}
+
+/* ✅ Detect OS */
+function detectOS(ua: string) {
+  if (ua.includes("Android")) return "Android";
+  if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
+  if (ua.includes("Windows")) return "Windows";
+  if (ua.includes("Mac OS")) return "Mac";
+  return "Unknown";
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { campaign_id, name, place, email } = body;
+
+    const {
+      campaign_id,
+      name,
+      place,
+      email,
+
+      visitor_id,
+      platform,
+      device_type,
+      screen_width,
+      screen_height,
+      language,
+      referrer,
+    } = body;
 
     // ✅ Required validation
     if (!name || !place || !email) {
@@ -13,7 +45,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Strict Email Validation
+    // ✅ Email Validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return Response.json(
@@ -22,7 +54,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Capture IP Address (Vercel + Local Safe)
+    // ✅ IP Address
     const rawIp =
       req.headers.get("x-forwarded-for") ||
       req.headers.get("x-real-ip") ||
@@ -30,45 +62,27 @@ export async function POST(req: Request) {
 
     const ip = rawIp.split(",")[0]?.trim() || "unknown";
 
-    // ✅ Capture Device Info
+    // ✅ User Agent
     const userAgent = req.headers.get("user-agent") || "unknown";
 
-    // ✅ Default location values
-    let city: string | null = null;
-    let region: string | null = null;
-    let country: string | null = null;
+    // ✅ Browser + OS
+    const browser = detectBrowser(userAgent);
+    const os = detectOS(userAgent);
 
-    // ✅ Fetch Location by IP
-    if (ip !== "unknown") {
-      try {
-        const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, {
-          headers: {
-            // ipapi sometimes blocks requests without UA
-            "User-Agent": "Mozilla/5.0 (MailtoLinkApp)",
-          },
-        });
+    // ✅ Vercel Geo Headers (Works Only in Production)
+    const country = req.headers.get("x-vercel-ip-country") || null;
+    const region = req.headers.get("x-vercel-ip-country-region") || null;
+    const city = req.headers.get("x-vercel-ip-city") || null;
 
-        // ✅ Check if request succeeded
-        if (!geoRes.ok) {
-          console.log("Geo API failed:", geoRes.status);
-        } else {
-          const geoData = await geoRes.json();
-
-          // ✅ ipapi error response handling
-          if (geoData.error) {
-            console.log("Geo lookup error:", geoData.reason);
-          } else {
-            city = geoData.city || null;
-            region = geoData.region || null;
-            country = geoData.country_name || null;
-          }
-        }
-      } catch (geoError) {
-        console.log("Geo lookup failed:", geoError);
-      }
-
-    }
-    console.log("Saving Location:", { city, region, country });
+    console.log("Logging Visitor:", {
+      name,
+      city,
+      region,
+      country,
+      device_type,
+      browser,
+      os,
+    });
 
     // ✅ Insert into Supabase
     const { error } = await supabaseServer.from("email_requests").insert([
@@ -77,8 +91,20 @@ export async function POST(req: Request) {
         name,
         place,
         email,
+
+        visitor_id,
+        device_type,
+        browser,
+        os,
+        platform,
+        screen_width,
+        screen_height,
+        language,
+        referrer,
+
         ip_address: ip,
         user_agent: userAgent,
+
         city,
         region,
         country,
@@ -92,10 +118,7 @@ export async function POST(req: Request) {
       );
     }
 
-    return Response.json({
-      success: true,
-      location: { city, region, country },
-    });
+    return Response.json({ success: true });
   } catch (err) {
     return Response.json(
       { success: false, error: "Invalid request format" },
