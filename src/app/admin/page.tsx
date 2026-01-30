@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from 'next/link';
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 import CampaignManagerClient from "./CampaignManagerClient";
@@ -77,7 +78,13 @@ export default async function AdminPage() {
     .slice(0, 5);
 
   // Recent Campaigns
-  const recentCampaigns = [...campaignList].slice(0, 5);
+  const recentCampaigns = [...campaignList]
+    .map((c) => ({
+    ...c,
+    count: campaignEmailCount[c.id] || 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   // Country counts
   const countryCount: any = {};
@@ -114,22 +121,13 @@ export default async function AdminPage() {
             Admin Dashboard — Campaign Insights & Analytics
           </p>
         </div>
+          <Link href="/create-campaign" style={styles.secondaryBtn}>Create Campaign</Link>
+          {/* ✅ LOGOUT BUTTON */}
+          <form action="/api/admin-logout" method="POST">
+            <button style={styles.logoutBtn}>Logout</button>
+          </form>
 
-        <form action="/api/admin-logout" method="POST">
-          <button style={styles.logoutBtn}>Logout</button>
-        </form>
       </header>
-
-      {/* ✅ ACTION BUTTONS */}
-      <section style={styles.actionsRow}>
-        <a href="/create-campaign" style={styles.primaryBtn}>
-          ➕ Create Campaign
-        </a>
-
-        <a href="/api/export-csv" style={styles.secondaryBtn}>
-          ⬇ Export CSV
-        </a>
-      </section>
 
       {/* ✅ GLOBAL STATS */}
       <section style={styles.statsGrid}>
@@ -157,7 +155,8 @@ export default async function AdminPage() {
             <p key={c.id} style={styles.insightItem}>
               <b>{c.campaign_name}</b>
               <br />
-              {new Date(c.created_at).toLocaleDateString()}
+              {new Date(c.created_at).toLocaleDateString()} —{" "}
+              {c.count} emails
             </p>
           ))}
         </InsightCard>
@@ -180,14 +179,15 @@ export default async function AdminPage() {
       </section>
 
       {/* ✅ CAMPAIGN MANAGER */}
-      <section style={styles.sectionCard}>
-        <h2 style={styles.sectionTitle}>Campaign Manager</h2>
-        <CampaignManagerClient campaigns={campaignList} />
+      <section style={styles.statsGrid}>
+        <CampaignManagerClient
+          campaigns={campaignList}
+          campaignEmailCount={campaignEmailCount}
+        />
       </section>
 
       {/* ✅ EMAIL REQUEST TABLE */}
-      <section style={styles.sectionCard}>
-        <h2 style={styles.sectionTitle}>Email Requests</h2>
+      <section style={styles.statsGrid}>
         <AdminTableClient rows={rows} />
       </section>
 
@@ -311,13 +311,13 @@ const styles: any = {
   },
 
   statTitle: {
-    fontSize: 13,
-    color: "#6b7280",
+    fontSize: 16,
+    color: "#104ecc",
     marginBottom: 6,
   },
 
   statValue: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: "bold",
     color: "#111827",
   },
@@ -331,8 +331,8 @@ const styles: any = {
   },
 
   insightItem: {
-    fontSize: 13,
-    color: "#374151",
+    fontSize: 16,
+    color: "#111827",
     marginBottom: 10,
   },
 
@@ -344,10 +344,11 @@ const styles: any = {
   },
 
   sectionTitle: {
+    textAlign: "center",
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 12,
-    color: "#111827",
+    color: "#000000",
   },
 
   footer: {

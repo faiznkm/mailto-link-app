@@ -1,47 +1,87 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export default function CampaignManagerClient({
   campaigns,
+  campaignEmailCount,
 }: {
   campaigns: any[];
+  campaignEmailCount: Record<string, number>;
 }) {
   const [items, setItems] = useState(campaigns);
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<
+    "campaign" | "count" | "start" | "end" | "status"
+  >("campaign");
 
-  // Table Sorting
-  const [sortKey, setSortKey] = useState("campaign");
-  const sortedItems = [...items].sort((a, b) => {
-    if (sortKey === "campaign") {
-      return a.campaign_name.localeCompare(b.campaign_name);
-    }
-    if (sortKey === "start") {
-      return (a.start_date || "").localeCompare(b.start_date || "");
-    }
-    if (sortKey === "end") {
-      return (a.end_date || "").localeCompare(b.end_date || "");
-    }
-    if (sortKey === "status") {
-      return Number(b.is_active) - Number(a.is_active);
-    }
-    return 0;
-  });
+  /* ----------------------------
+     Derived data
+  ----------------------------- */
+
+  const filtered = useMemo(() => {
+    return items.filter((c) =>
+      c.campaign_name
+        ?.toLowerCase()
+        .includes(search.toLowerCase())
+    );
+  }, [items, search]);
+
+  const sortedItems = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "campaign") {
+        return a.campaign_name.localeCompare(
+          b.campaign_name
+        );
+      }
+
+      if (sortKey === "count") {
+        const countA = campaignEmailCount[a.id] || 0;
+        const countB = campaignEmailCount[b.id] || 0;
+        return countB - countA; // desc
+      }
+
+      if (sortKey === "start") {
+        return (a.start_date || "").localeCompare(
+          b.start_date || ""
+        );
+      }
+
+      if (sortKey === "end") {
+        return (a.end_date || "").localeCompare(
+          b.end_date || ""
+        );
+      }
+
+      if (sortKey === "status") {
+        return Number(b.is_active) - Number(a.is_active);
+      }
+
+      return 0;
+    });
+  }, [filtered, sortKey, campaignEmailCount]);
+
+  const activeCount = items.filter(
+    (c) => c.is_active
+  ).length;
+
+  /* ----------------------------
+     Actions
+  ----------------------------- */
+
   async function toggleCampaign(id: number, current: boolean) {
     const newValue = !current;
 
-    // ✅ Optimistic UI update
+    // optimistic update
     setItems((prev) =>
       prev.map((c) =>
         c.id === id ? { ...c, is_active: newValue } : c
       )
     );
 
-    // ✅ Call API
     const res = await fetch("/api/toggle-campaign", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, is_active: newValue }),
     });
 
@@ -50,29 +90,70 @@ export default function CampaignManagerClient({
     }
   }
 
+  /* ----------------------------
+     UI
+  ----------------------------- */
+
   return (
-    <div>
-      {/* Table Wrapper */}
-      <div style={styles.tableWrap}>
-        <table style={styles.table}>
+    <div style={ui.card}>
+      {/* Header */}
+      <div style={ui.header}>
+        <div>
+          <h3 style={ui.title}>All Campaigns</h3>
+          <p style={ui.sub}>
+            {items.length} campaigns • {activeCount} active
+          </p>
+        </div>
+
+        <input
+          placeholder="Search campaigns…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={ui.search}
+        />
+      </div>
+
+      {/* Table */}
+      <div style={ui.tableWrap}>
+        <table style={ui.table}>
           <thead>
-            <tr style={styles.headRow}>
-              <th onClick={() => setSortKey("campaign")}>Campaign ⬍</th>
+            <tr>
+              <th>Sl</th>
+              <th onClick={() => setSortKey("campaign")}>
+                Campaign
+              </th>
+              <th onClick={() => setSortKey("count")}>
+                Support ⬍
+              </th>
               <th>Slug</th>
-              <th onClick={() => setSortKey("start")}>Start ⬍</th>
-              <th onClick={() => setSortKey("end")}>End ⬍</th>
-              <th onClick={() => setSortKey("status")}>Status ⬍</th>
+              <th onClick={() => setSortKey("start")}>
+                Start
+              </th>
+              <th onClick={() => setSortKey("end")}>
+                End
+              </th>
+              <th onClick={() => setSortKey("status")}>
+                Status
+              </th>
             </tr>
           </thead>
 
           <tbody>
-            {sortedItems.map((c) => (
+            {sortedItems.map((c, index) => (
               <tr key={c.id} style={styles.row}>
-                {/* Campaign Name */}
+                {/* Sl */}
+                <td style={styles.td}>{index + 1}</td>
+
+                {/* Campaign */}
                 <td style={styles.td}>
                   <p style={styles.campaignTitle}>
                     {c.campaign_name}
                   </p>
+                </td>
+
+                {/* Support count */}
+                <td style={styles.td}>
+                  {campaignEmailCount[c.id] || 0}
                 </td>
 
                 {/* Slug */}
@@ -90,185 +171,175 @@ export default function CampaignManagerClient({
                 <td style={styles.td}>
                   {c.start_date || "-"}
                 </td>
-
                 <td style={styles.td}>
                   {c.end_date || "-"}
                 </td>
 
-                {/* Status + Toggle */}
+                {/* Status */}
                 <td style={styles.td}>
-                  <div style={styles.statusWrap}>
-                    {/* Badge */}
-                    {c.is_active ? (
-                      <span style={styles.activeBadge}>
-                        Active
-                      </span>
-                    ) : (
-                      <span style={styles.closedBadge}>
-                        Closed
-                      </span>
-                    )}
-
-                    {/* Toggle */}
-                    <label style={switchStyle}>
-                      <input
-                        type="checkbox"
-                        checked={c.is_active}
-                        onChange={() =>
-                          toggleCampaign(c.id, c.is_active)
-                        }
-                        style={{ display: "none" }}
-                      />
-
-                      <span
-                        style={{
-                          ...sliderStyle,
-                          background: c.is_active
-                            ? "#4f46e5"
-                            : "#d1d5db",
-                        }}
-                      >
-                        <span
-                          style={{
-                            ...dotStyle,
-                            transform: c.is_active
-                              ? "translateX(22px)"
-                              : "translateX(0px)",
-                          }}
-                        />
-                      </span>
-                    </label>
-                  </div>
+                  <StatusToggle
+                    active={c.is_active}
+                    onToggle={() =>
+                      toggleCampaign(c.id, c.is_active)
+                    }
+                  />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* Empty */}
-        {items.length === 0 && (
-          <p style={styles.emptyText}>
-            No campaigns created yet.
-          </p>
+        {sortedItems.length === 0 && (
+          <p style={ui.empty}>No campaigns found</p>
         )}
       </div>
     </div>
   );
 }
 
-/* ---------------------------
-   ✅ Modern Styles
----------------------------- */
+/* ----------------------------
+   Status Toggle
+----------------------------- */
 
-const styles: any = {
+function StatusToggle({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <label style={toggle.wrap}>
+      <input
+        type="checkbox"
+        checked={active}
+        onChange={onToggle}
+        hidden
+      />
+      <span
+        style={{
+          ...toggle.slider,
+          background: active ? "#4f46e5" : "#d1d5db",
+        }}
+      >
+        <span
+          style={{
+            ...toggle.dot,
+            transform: active
+              ? "translateX(22px)"
+              : "translateX(0)",
+          }}
+        />
+      </span>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: active ? "#166534" : "#991b1b",
+        }}
+      >
+        {active ? "Active" : "Closed"}
+      </span>
+    </label>
+  );
+}
+
+/* ----------------------------
+   Styles
+----------------------------- */
+
+const ui: any = {
+  card: {
+    background: "#fff",
+    borderRadius: 18,
+    padding: 18,
+    boxShadow: "0 6px 18px rgba(0,0,0,.06)",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    margin: 0,
+  },
+  sub: {
+    fontSize: 13,
+    color: "#6b7280",
+  },
+  search: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid #e5e7eb",
+    fontSize: 14,
+    minWidth: 220,
+  },
   tableWrap: {
     overflowX: "auto",
-    borderRadius: 14,
     border: "1px solid #e5e7eb",
+    borderRadius: 14,
   },
-
   table: {
     width: "100%",
     borderCollapse: "collapse",
+    minWidth: 750,
     fontSize: 14,
-    minWidth: 650,
   },
-
-  headRow: {
-    background: "#f9fafb",
-    textAlign: "left",
+  empty: {
+    padding: 16,
+    textAlign: "center",
+    color: "#6b7280",
   },
+};
 
-  th: {
-    padding: "12px 14px",
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#374151",
-  },
-
+const styles: any = {
   row: {
     borderTop: "1px solid #f3f4f6",
   },
-
   td: {
     padding: "14px",
     verticalAlign: "middle",
     color: "#111827",
+    fontSize: 14,
   },
-
   campaignTitle: {
     fontWeight: "600",
     fontSize: 14,
     margin: 0,
   },
-
   slugLink: {
     color: "#2563eb",
     textDecoration: "none",
     fontWeight: "600",
   },
+};
 
-  statusWrap: {
+const toggle: any = {
+  wrap: {
     display: "flex",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
+    cursor: "pointer",
   },
-
-  activeBadge: {
-    background: "#dcfce7",
-    color: "#166534",
-    padding: "4px 10px",
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: "bold",
+  slider: {
+    position: "relative",
+    width: 46,
+    height: 24,
+    borderRadius: 20,
+    transition: "0.3s",
   },
-
-  closedBadge: {
-    background: "#fee2e2",
-    color: "#991b1b",
-    padding: "4px 10px",
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: "bold",
+  dot: {
+    position: "absolute",
+    height: 18,
+    width: 18,
+    left: 3,
+    bottom: 3,
+    background: "#fff",
+    borderRadius: "50%",
+    transition: "0.3s",
   },
-
-  emptyText: {
-    padding: 15,
-    textAlign: "center",
-    fontSize: 14,
-    color: "#6b7280",
-  },
-};
-
-/* ---------------------------
-   ✅ Toggle Switch Styles
----------------------------- */
-
-const switchStyle: React.CSSProperties = {
-  position: "relative",
-  display: "inline-block",
-  width: 46,
-  height: 24,
-};
-
-const sliderStyle: React.CSSProperties = {
-  position: "absolute",
-  cursor: "pointer",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  borderRadius: 20,
-  transition: "0.3s",
-};
-
-const dotStyle: React.CSSProperties = {
-  position: "absolute",
-  height: 18,
-  width: 18,
-  left: 3,
-  bottom: 3,
-  backgroundColor: "white",
-  borderRadius: "50%",
-  transition: "0.3s",
 };
