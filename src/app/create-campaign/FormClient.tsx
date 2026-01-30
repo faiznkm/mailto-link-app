@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
-// Auto slug generator
+/* ================= Helpers ================= */
+
 function generateSlug(length = 6) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
   let slug = "";
@@ -13,15 +15,26 @@ function generateSlug(length = 6) {
   return slug;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+
+const parseEmails = (value: string) =>
+  value.split(",").map((e) => e.trim()).filter(Boolean);
+
+const validateEmails = (emails: string[]) =>
+  emails.filter((email) => !EMAIL_REGEX.test(email));
+
+/* ================= Component ================= */
+
 export default function FormClient() {
   const router = useRouter();
 
   const [campaignName, setCampaignName] = useState("");
   const [description, setDescription] = useState("");
-  
   const [slug, setSlug] = useState("");
   const [customDomain, setCustomDomain] = useState("");
+
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const [toEmail, setToEmail] = useState("");
   const [ccEmail, setCcEmail] = useState("");
@@ -31,13 +44,63 @@ export default function FormClient() {
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [noEndDate, setNoEndDate] = useState(false);
 
   useEffect(() => {
     setSlug(generateSlug());
   }, []);
 
+  async function handleImageUpload(file: File) {
+    if (!file.type.startsWith("image/")) {
+      alert("Only image files allowed");
+      return;
+    }
+
+    if (file.size > 1024 * 1024) {
+      alert("Image must be under 1MB");
+      return;
+    }
+
+    setUploading(true);
+
+    const fileName = `campaign-${Date.now()}-${file.name}`;
+
+    const { error } = await supabase.storage
+      .from("thumbnails")
+      .upload(fileName, file);
+
+    if (error) {
+      alert(error.message);
+      setUploading(false);
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("campaign-thumbnails")
+      .getPublicUrl(fileName);
+
+    setThumbnailUrl(data.publicUrl);
+    setUploading(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const toEmails = parseEmails(toEmail);
+    const ccEmails = parseEmails(ccEmail);
+
+    const invalidTo = validateEmails(toEmails);
+    const invalidCc = validateEmails(ccEmails);
+
+    if (invalidTo.length) {
+      alert("Invalid TO emails:\n" + invalidTo.join(", "));
+      return;
+    }
+
+    if (invalidCc.length) {
+      alert("Invalid CC emails:\n" + invalidCc.join(", "));
+      return;
+    }
 
     const res = await fetch("/api/create-campaign", {
       method: "POST",
@@ -48,12 +111,12 @@ export default function FormClient() {
         slug,
         custom_domain: customDomain,
         thumbnail_url: thumbnailUrl,
-        to_email: toEmail,
-        cc_email: ccEmail,
+        to_email: toEmails,
+        cc_email: ccEmails,
         subject,
         body_text: bodyText,
         start_date: startDate,
-        end_date: endDate,
+        end_date: noEndDate ? null : endDate,
       }),
     });
 
@@ -68,24 +131,23 @@ export default function FormClient() {
     router.push(`/${slug}`);
   }
 
+  /* ================= JSX ================= */
+
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      {/* Section 1 */}
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>📌 Campaign Info</h2>
 
-        <label style={styles.label}>Campaign Name</label>
         <input
-          placeholder="Eg: Student Support Campaign"
+          placeholder="Campaign Name"
           value={campaignName}
           required
           onChange={(e) => setCampaignName(e.target.value)}
           style={styles.input}
         />
 
-        <label style={styles.label}>Description</label>
         <textarea
-          placeholder="This text will be shown to public users..."
+          placeholder="Description"
           value={description}
           required
           rows={3}
@@ -94,84 +156,56 @@ export default function FormClient() {
         />
       </div>
 
-      {/* Section 2 */}
       <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>🔗 Campaign Link</h2>
+        <h2 style={styles.sectionTitle}>🖼 Thumbnail</h2>
 
-        <label style={styles.label}>Slug (Auto Generated)</label>
         <input
-          value={slug}
-          required
-          onChange={(e) => setSlug(e.target.value)}
-          style={styles.input}
+          type="file"
+          accept="image/*"
+          onChange={(e) =>
+            e.target.files && handleImageUpload(e.target.files[0])
+          }
         />
 
-        <p style={styles.helper}>
-          Public link will be:{" "}
-          <b style={{ color: "#2563eb" }}>
-            {customDomain
-              ? `https://${customDomain}/${slug}`
-              : `https://yourapp.com/${slug}`}
-          </b>
-        </p>
+        {uploading && <p>Uploading...</p>}
 
-        <label style={styles.label}>Custom Domain (Optional)</label>
-        <input
-          placeholder="Eg: campaign.myorg.com"
-          value={customDomain}
-          onChange={(e) => setCustomDomain(e.target.value)}
-          style={styles.input}
-        />
-
-        <label style={styles.label}>Thumbnail Image URL</label>
-        <input
-          placeholder="https://example.com/banner.png"
-          value={thumbnailUrl}
-          onChange={(e) => setThumbnailUrl(e.target.value)}
-          style={styles.input}
-        />
-
-        <p style={styles.helper}>
-          This image will appear when the link is shared on WhatsApp/Facebook.
-        </p>
+        {thumbnailUrl && (
+          <img
+            src={thumbnailUrl}
+            alt="Thumbnail"
+            style={{ marginTop: 10, width: "100%", borderRadius: 12 }}
+          />
+        )}
       </div>
 
-
-      {/* Section 3 */}
       <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>📨 Email Template</h2>
+        <h2 style={styles.sectionTitle}>📨 Email</h2>
 
-        <label style={styles.label}>To Email</label>
         <input
-          type="email"
-          placeholder="receiver@example.com"
+          placeholder="To emails (comma separated)"
           value={toEmail}
           required
           onChange={(e) => setToEmail(e.target.value)}
           style={styles.input}
         />
 
-        <label style={styles.label}>CC Email (Optional)</label>
         <input
-          type="email"
-          placeholder="copy@example.com"
+          placeholder="CC emails (comma separated)"
           value={ccEmail}
           onChange={(e) => setCcEmail(e.target.value)}
           style={styles.input}
         />
 
-        <label style={styles.label}>Subject</label>
         <input
-          placeholder="Eg: Support Request"
+          placeholder="Subject"
           value={subject}
           required
           onChange={(e) => setSubject(e.target.value)}
           style={styles.input}
         />
 
-        <label style={styles.label}>Body Template</label>
         <textarea
-          placeholder="Write the message users will send..."
+          placeholder="Body"
           value={bodyText}
           required
           rows={5}
@@ -180,11 +214,9 @@ export default function FormClient() {
         />
       </div>
 
-      {/* Section 4 */}
       <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>📅 Campaign Duration</h2>
+        <h2 style={styles.sectionTitle}>📅 Duration</h2>
 
-        <label style={styles.label}>Start Date</label>
         <input
           type="date"
           value={startDate}
@@ -193,23 +225,32 @@ export default function FormClient() {
           style={styles.input}
         />
 
-        <label style={styles.label}>End Date</label>
-        <input
-          type="date"
-          value={endDate}
-          required
-          onChange={(e) => setEndDate(e.target.value)}
-          style={styles.input}
-        />
+        {!noEndDate && (
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={styles.input}
+          />
+        )}
+
+        <label style={{ marginTop: 10, display: "block" }}>
+          <input
+            type="checkbox"
+            checked={noEndDate}
+            onChange={(e) => setNoEndDate(e.target.checked)}
+          />{" "}
+          No end date
+        </label>
       </div>
 
-      {/* Submit */}
       <button style={styles.button}>🚀 Create Campaign</button>
     </form>
   );
 }
 
-/* 🎨 Styles */
+/* ================= Styles ================= */
+
 const styles: any = {
   form: {
     marginTop: 30,
@@ -217,73 +258,45 @@ const styles: any = {
     flexDirection: "column",
     gap: 20,
   },
-
   card: {
     background: "white",
     padding: 22,
     borderRadius: 18,
     boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 15,
-    color: "#111827",
   },
-
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    display: "block",
-    marginBottom: 6,
-    marginTop: 10,
-    color: "#374151",
-  },
-
-  helper: {
-    fontSize: 13,
-    marginTop: 8,
-    color: "#6b7280",
-  },
-
   input: {
     width: "100%",
     padding: 11,
     borderRadius: 10,
     border: "1px solid #d1d5db",
-    fontSize: 14,
-    outline: "none",
+    marginBottom: 10,
   },
-
   textarea: {
     width: "100%",
     padding: 11,
     borderRadius: 10,
     border: "1px solid #d1d5db",
-    fontSize: 14,
-    resize: "none",
   },
-
   textareaLarge: {
     width: "100%",
     padding: 11,
     borderRadius: 10,
     border: "1px solid #d1d5db",
-    fontSize: 14,
-    resize: "vertical",
     minHeight: 120,
   },
-
   button: {
-    padding: "14px",
+    padding: 14,
     borderRadius: 14,
     fontWeight: "bold",
     fontSize: 16,
-    cursor: "pointer",
-    border: "none",
     background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
     color: "white",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+    border: "none",
+    cursor: "pointer",
   },
 };
