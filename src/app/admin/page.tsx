@@ -191,8 +191,30 @@ export default async function AdminPage() {
         <AdminTableClient rows={rows} />
       </section>
 
-      {/* Footer */}
-      <footer style={styles.footer}>© yezhara.com</footer>
+      {/* FOOTER */}
+      <footer
+        style={{
+          textAlign: "center",
+          marginTop: 60,
+          color: "black",
+          opacity: 0.9,
+          fontSize: 13,
+        }}
+      >
+        <p>
+          Need help? Contact{" "}
+          <a
+            href="mailto:mailto@yezhara.com"
+            style={{ color: "black", fontWeight: "bold" }}
+          >
+            mailto@yezhara.com
+          </a>
+        </p>
+
+        <p style={{ marginTop: 8, opacity: 0.8 }}>
+          © {new Date().getFullYear()} yezhara.com
+        </p>
+      </footer>
     </main>
   );
 }

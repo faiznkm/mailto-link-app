@@ -113,6 +113,31 @@ export default async function CampaignPage({
 
         <CampaignFormClient campaign={campaign} />
       </div>
+
+            {/* FOOTER */}
+      <footer
+        style={{
+          textAlign: "center",
+          marginTop: 60,
+          color: "white",
+          opacity: 0.9,
+          fontSize: 13,
+        }}
+      >
+        <p>
+          Need help? Contact{" "}
+          <a
+            href="mailto:mailto@yezhara.com"
+            style={{ color: "white", fontWeight: "bold" }}
+          >
+            mailto@yezhara.com
+          </a>
+        </p>
+
+        <p style={{ marginTop: 8, opacity: 0.8 }}>
+          © {new Date().getFullYear()} yezhara.com
+        </p>
+      </footer>
     </main>
   );
 }

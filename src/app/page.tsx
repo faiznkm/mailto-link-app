@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import CampaignSearch from "@/components/CampaignSearch";
 
 export default async function HomePage() {
-  // ✅ Fetch Latest Active Campaigns
+  // ✅ Fetch Latest Active Campaigns only
   const { data: latestCampaigns } = await supabaseAdmin
     .from("email_campaigns")
     .select("*")
@@ -11,16 +11,11 @@ export default async function HomePage() {
     .order("created_at", { ascending: false })
     .limit(3);
 
-  // ✅ Fetch Best Performing Campaigns (Top 3 by email_requests count)
-  const { data: topCampaigns } = await supabaseAdmin.rpc(
-    "top_campaigns_by_requests"
-  );
-
+  // ✅ Fetch all active campaigns for search
   const { data: allCampaigns } = await supabaseAdmin
-  .from("email_campaigns")
-  .select("id, campaign_name, slug")
-  .eq("is_active", true);
-
+    .from("email_campaigns")
+    .select("id, campaign_name, slug")
+    .eq("is_active", true);
 
   return (
     <main
@@ -43,13 +38,7 @@ export default async function HomePage() {
           Mailto Campaigns
         </h1>
 
-        <h2
-          style={{
-            fontSize: 22,
-            marginTop: 12,
-            fontWeight: 600,
-          }}
-        >
+        <h2 style={{ fontSize: 22, marginTop: 12, fontWeight: 600 }}>
           Let your voice be heard ✊
         </h2>
 
@@ -78,7 +67,7 @@ export default async function HomePage() {
           gap: 30,
         }}
       >
-        {/* Latest Campaigns */}
+        {/* Latest Active Campaigns */}
         <section>
           <h3
             style={{
@@ -97,26 +86,6 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
-
-        {/* Top Campaigns */}
-        <section>
-          <h3
-            style={{
-              fontSize: 20,
-              fontWeight: "bold",
-              color: "white",
-              marginBottom: 15,
-            }}
-          >
-            Most Successful Campaigns
-          </h3>
-
-          <div style={gridStyle}>
-            {topCampaigns?.slice(0, 3).map((c: any) => (
-              <CampaignCard key={c.id} campaign={c} />
-            ))}
-          </div>
-        </section>
       </div>
 
       {/* FOOTER */}
@@ -125,11 +94,23 @@ export default async function HomePage() {
           textAlign: "center",
           marginTop: 60,
           color: "white",
-          opacity: 0.8,
+          opacity: 0.9,
           fontSize: 13,
         }}
       >
-        © {new Date().getFullYear()} yezhara.com
+        <p>
+          Need help? Contact{" "}
+          <a
+            href="mailto:mailto@yezhara.com"
+            style={{ color: "white", fontWeight: "bold" }}
+          >
+            mailto@yezhara.com
+          </a>
+        </p>
+
+        <p style={{ marginTop: 8, opacity: 0.8 }}>
+          © {new Date().getFullYear()} yezhara.com
+        </p>
       </footer>
     </main>
   );
@@ -138,12 +119,7 @@ export default async function HomePage() {
 /* ✅ Card Component */
 function CampaignCard({ campaign }: { campaign: any }) {
   return (
-    <Link
-      href={`/${campaign.slug}`}
-      style={{
-        textDecoration: "none",
-      }}
-    >
+    <Link href={`/${campaign.slug}`} style={{ textDecoration: "none" }}>
       <div
         style={{
           background: "white",
