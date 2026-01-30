@@ -226,7 +226,7 @@ function InsightCard({ title, children }: any) {
 const styles: any = {
   page: {
     minHeight: "100vh",
-    background: "#f9fafb",
+    background: "linear-gradient(to bottom, #f3f4f6, #ffffff)",
     padding: "25px 15px",
     fontFamily: "system-ui, sans-serif",
   },
@@ -234,6 +234,10 @@ const styles: any = {
   header: {
     maxWidth: 1100,
     margin: "0 auto",
+    padding: "18px 20px",
+    borderRadius: 18,
+    background: "#111827",
+    color: "white",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -245,13 +249,13 @@ const styles: any = {
   brand: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#111827",
+    color: "white",
   },
 
   tagline: {
     fontSize: 14,
     marginTop: 4,
-    color: "#6b7280",
+    color: "#d1d5db",
   },
 
   logoutBtn: {

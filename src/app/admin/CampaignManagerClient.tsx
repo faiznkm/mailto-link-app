@@ -9,6 +9,23 @@ export default function CampaignManagerClient({
 }) {
   const [items, setItems] = useState(campaigns);
 
+  // Table Sorting
+  const [sortKey, setSortKey] = useState("campaign");
+  const sortedItems = [...items].sort((a, b) => {
+    if (sortKey === "campaign") {
+      return a.campaign_name.localeCompare(b.campaign_name);
+    }
+    if (sortKey === "start") {
+      return (a.start_date || "").localeCompare(b.start_date || "");
+    }
+    if (sortKey === "end") {
+      return (a.end_date || "").localeCompare(b.end_date || "");
+    }
+    if (sortKey === "status") {
+      return Number(b.is_active) - Number(a.is_active);
+    }
+    return 0;
+  });
   async function toggleCampaign(id: number, current: boolean) {
     const newValue = !current;
 
@@ -40,16 +57,16 @@ export default function CampaignManagerClient({
         <table style={styles.table}>
           <thead>
             <tr style={styles.headRow}>
-              <th style={styles.th}>Campaign</th>
-              <th style={styles.th}>Slug</th>
-              <th style={styles.th}>Start</th>
-              <th style={styles.th}>End</th>
-              <th style={styles.th}>Status</th>
+              <th onClick={() => setSortKey("campaign")}>Campaign ⬍</th>
+              <th>Slug</th>
+              <th onClick={() => setSortKey("start")}>Start ⬍</th>
+              <th onClick={() => setSortKey("end")}>End ⬍</th>
+              <th onClick={() => setSortKey("status")}>Status ⬍</th>
             </tr>
           </thead>
 
           <tbody>
-            {items.map((c) => (
+            {sortedItems.map((c) => (
               <tr key={c.id} style={styles.row}>
                 {/* Campaign Name */}
                 <td style={styles.td}>

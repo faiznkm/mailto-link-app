@@ -5,14 +5,22 @@ import { useState } from "react";
 export default function AdminTableClient({ rows }: { rows: any[] }) {
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("");
-  const [sortBy, setSortBy] = useState("date");
 
-  /* ✅ Unique country list */
+  /* ✅ Sorting State */
+  const [sortColumn, setSortColumn] = useState<
+    "name" | "country" | "date"
+  >("date");
+
+  const [sortDirection, setSortDirection] = useState<
+    "asc" | "desc"
+  >("desc");
+
+  /* ✅ Unique Countries */
   const countries = Array.from(
     new Set(rows.map((r) => r.country).filter(Boolean))
   );
 
-  /* ✅ Filter + Search */
+  /* ✅ Filtering */
   let filtered = rows.filter((r) => {
     const text =
       (r.name + r.email + r.place).toLowerCase();
@@ -25,17 +33,49 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
     return matchesSearch && matchesCountry;
   });
 
-  /* ✅ Sorting */
-  if (sortBy === "name") {
-    filtered.sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-  } else {
-    filtered.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() -
-        new Date(a.created_at).getTime()
-    );
+  /* ✅ Sorting Logic */
+  filtered.sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
+
+    if (sortColumn === "name") {
+      valueA = a.name.toLowerCase();
+      valueB = b.name.toLowerCase();
+    }
+
+    if (sortColumn === "country") {
+      valueA = (a.country || "").toLowerCase();
+      valueB = (b.country || "").toLowerCase();
+    }
+
+    if (sortColumn === "date") {
+      valueA = new Date(a.created_at).getTime();
+      valueB = new Date(b.created_at).getTime();
+    }
+
+    if (valueA < valueB) return sortDirection === "asc" ? -1 : 1;
+    if (valueA > valueB) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  /* ✅ Header Click Handler */
+  function handleSort(col: "name" | "country" | "date") {
+    if (sortColumn === col) {
+      // Toggle direction
+      setSortDirection((prev) =>
+        prev === "asc" ? "desc" : "asc"
+      );
+    } else {
+      // New column sort
+      setSortColumn(col);
+      setSortDirection("asc");
+    }
+  }
+
+  /* ✅ Sort Arrow */
+  function arrow(col: string) {
+    if (sortColumn !== col) return "⬍";
+    return sortDirection === "asc" ? "⬆" : "⬇";
   }
 
   /* ✅ CSV Export */
@@ -66,7 +106,6 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
     <div style={styles.wrapper}>
       {/* ✅ Controls */}
       <div style={styles.controls}>
-        {/* Search */}
         <input
           placeholder="Search name, email, place..."
           value={search}
@@ -74,7 +113,6 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
           style={styles.input}
         />
 
-        {/* Country Filter */}
         <select
           value={countryFilter}
           onChange={(e) => setCountryFilter(e.target.value)}
@@ -88,26 +126,14 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
           ))}
         </select>
 
-        {/* Sort */}
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          style={styles.input}
-        >
-          <option value="date">Sort: Latest</option>
-          <option value="name">Sort: Name A-Z</option>
-        </select>
-
-        {/* Export */}
         <button onClick={exportCSV} style={styles.exportBtn}>
           ⬇ Export CSV
         </button>
       </div>
 
-      {/* ✅ Result Count */}
+      {/* Count */}
       <p style={styles.countText}>
-        Showing{" "}
-        <b>{filtered.length}</b> records
+        Showing <b>{filtered.length}</b> records
       </p>
 
       {/* ✅ Table */}
@@ -115,12 +141,30 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
         <table style={styles.table}>
           <thead>
             <tr style={styles.headRow}>
-              <th style={styles.th}>Name</th>
+              <th
+                style={styles.sortableTh}
+                onClick={() => handleSort("name")}
+              >
+                Name {arrow("name")}
+              </th>
+
               <th style={styles.th}>Email</th>
               <th style={styles.th}>Place</th>
               <th style={styles.th}>City</th>
-              <th style={styles.th}>Country</th>
-              <th style={styles.th}>Date</th>
+
+              <th
+                style={styles.sortableTh}
+                onClick={() => handleSort("country")}
+              >
+                Country {arrow("country")}
+              </th>
+
+              <th
+                style={styles.sortableTh}
+                onClick={() => handleSort("date")}
+              >
+                Date {arrow("date")}
+              </th>
             </tr>
           </thead>
 
@@ -141,7 +185,6 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
         </table>
       </div>
 
-      {/* Limit Note */}
       <p style={styles.note}>
         Only first 50 records shown for performance.
       </p>
@@ -149,14 +192,9 @@ export default function AdminTableClient({ rows }: { rows: any[] }) {
   );
 }
 
-/* ---------------------------
-   ✅ Modern Table Styles
----------------------------- */
-
+/* ✅ Styles */
 const styles: any = {
-  wrapper: {
-    marginTop: 10,
-  },
+  wrapper: { marginTop: 10 },
 
   controls: {
     display: "flex",
@@ -171,7 +209,6 @@ const styles: any = {
     border: "1px solid #e5e7eb",
     fontSize: 14,
     minWidth: 180,
-    outline: "none",
   },
 
   exportBtn: {
@@ -182,7 +219,6 @@ const styles: any = {
     border: "none",
     cursor: "pointer",
     fontWeight: "bold",
-    fontSize: 13,
   },
 
   countText: {
@@ -216,6 +252,15 @@ const styles: any = {
     color: "#374151",
   },
 
+  sortableTh: {
+    padding: "12px 14px",
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#111827",
+    cursor: "pointer",
+    userSelect: "none",
+  },
+
   row: {
     borderTop: "1px solid #f3f4f6",
   },
@@ -223,7 +268,6 @@ const styles: any = {
   td: {
     padding: "14px",
     color: "#111827",
-    verticalAlign: "middle",
   },
 
   note: {
