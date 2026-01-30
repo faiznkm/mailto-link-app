@@ -1,114 +1,185 @@
+import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { cookies } from "next/headers";
+import CampaignSearch from "@/components/CampaignSearch";
 
 export default async function HomePage() {
-  // Check admin login cookie
-  const cookieStore = await cookies();
-  const isAdmin = cookieStore.get("admin_auth")?.value === "true";
-
-  // Fetch all campaigns
-  const { data: campaigns } = await supabaseAdmin
+  // ✅ Fetch Latest Active Campaigns
+  const { data: latestCampaigns } = await supabaseAdmin
     .from("email_campaigns")
     .select("*")
-    .order("created_at", { ascending: false });
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(3);
 
-  const today = new Date().toISOString().split("T")[0];
+  // ✅ Fetch Best Performing Campaigns (Top 3 by email_requests count)
+  const { data: topCampaigns } = await supabaseAdmin.rpc(
+    "top_campaigns_by_requests"
+  );
+
+  const { data: allCampaigns } = await supabaseAdmin
+  .from("email_campaigns")
+  .select("id, campaign_name, slug")
+  .eq("is_active", true);
+
 
   return (
-    <main style={{ padding: 50 }}>
-      <h1 style={{ fontSize: 32, fontWeight: "bold" }}>
-        Mail Campaign Link Generator
-      </h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
+        padding: "40px 16px",
+      }}
+    >
+      {/* HERO */}
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "0 auto",
+          textAlign: "center",
+          color: "white",
+        }}
+      >
+        <h1 style={{ fontSize: 34, fontWeight: "bold" }}>
+          Mailto Campaigns
+        </h1>
 
-      <p style={{ marginTop: 10 }}>
-        Create campaigns and share unique links for users to send emails easily.
-      </p>
-
-      {/* Admin Create Button */}
-      {isAdmin && (
-        <a
-          href="/create-campaign"
+        <h2
           style={{
-            display: "inline-block",
-            marginTop: 20,
-            padding: "12px 18px",
-            background: "black",
-            color: "white",
-            borderRadius: 8,
-            textDecoration: "none",
-            fontWeight: "bold",
+            fontSize: 22,
+            marginTop: 12,
+            fontWeight: 600,
           }}
         >
-          ➕ Create New Campaign
-        </a>
-      )}
+          Let your voice be heard ✊
+        </h2>
 
-      {/* Campaign List */}
-      <h2 style={{ marginTop: 40, fontSize: 22 }}>
-        Available Campaigns
-      </h2>
+        <p
+          style={{
+            marginTop: 12,
+            fontSize: 15,
+            lineHeight: 1.6,
+            opacity: 0.95,
+          }}
+        >
+          Join active campaigns and send emails instantly to support causes that
+          matter. Every message counts.
+        </p>
 
-      {!campaigns || campaigns.length === 0 ? (
-        <p style={{ marginTop: 20 }}>No campaigns created yet.</p>
-      ) : (
-        <div style={{ marginTop: 20 }}>
-          {campaigns.map((c) => {
-            // Status logic
-            let status = "Active";
+        {/* SEARCH */}
+        <CampaignSearch campaigns={allCampaigns || []} />
+      </div>
 
-            if (!c.is_active) status = "Inactive";
-            else if (today < c.start_date) status = "Upcoming";
-            else if (today > c.end_date) status = "Expired";
+      {/* CONTENT */}
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "40px auto 0",
+          display: "grid",
+          gap: 30,
+        }}
+      >
+        {/* Latest Campaigns */}
+        <section>
+          <h3
+            style={{
+              fontSize: 20,
+              fontWeight: "bold",
+              color: "white",
+              marginBottom: 15,
+            }}
+          >
+            Latest Active Campaigns
+          </h3>
 
-            return (
-              <div
-                key={c.id}
-                style={{
-                  padding: 15,
-                  border: "1px solid #ddd",
-                  borderRadius: 10,
-                  marginBottom: 15,
-                }}
-              >
-                <h3 style={{ fontSize: 18, fontWeight: "bold" }}>
-                  {c.campaign_name}
-                </h3>
+          <div style={gridStyle}>
+            {latestCampaigns?.map((c) => (
+              <CampaignCard key={c.id} campaign={c} />
+            ))}
+          </div>
+        </section>
 
-                <p style={{ marginTop: 5 }}>
-                  Link:{" "}
-                  <a
-                    href={`/${c.slug}`}
-                    target="_blank"
-                    style={{ textDecoration: "underline" }}
-                  >
-                    /{c.slug}
-                  </a>
-                </p>
+        {/* Top Campaigns */}
+        <section>
+          <h3
+            style={{
+              fontSize: 20,
+              fontWeight: "bold",
+              color: "white",
+              marginBottom: 15,
+            }}
+          >
+            Most Successful Campaigns
+          </h3>
 
-                <p style={{ marginTop: 5 }}>
-                  Status:{" "}
-                  <b
-                    style={{
-                      color:
-                        status === "Active"
-                          ? "green"
-                          : status === "Inactive"
-                          ? "gray"
-                          : "red",
-                    }}
-                  >
-                    {status}
-                  </b>
-                </p>
+          <div style={gridStyle}>
+            {topCampaigns?.slice(0, 3).map((c: any) => (
+              <CampaignCard key={c.id} campaign={c} />
+            ))}
+          </div>
+        </section>
+      </div>
 
-                <p style={{ marginTop: 5, fontSize: 13 }}>
-                  Start: {c.start_date} | End: {c.end_date}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* FOOTER */}
+      <footer
+        style={{
+          textAlign: "center",
+          marginTop: 60,
+          color: "white",
+          opacity: 0.8,
+          fontSize: 13,
+        }}
+      >
+        © {new Date().getFullYear()} yezhara.com
+      </footer>
     </main>
   );
 }
+
+/* ✅ Card Component */
+function CampaignCard({ campaign }: { campaign: any }) {
+  return (
+    <Link
+      href={`/${campaign.slug}`}
+      style={{
+        textDecoration: "none",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          borderRadius: 18,
+          padding: 18,
+          boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
+          transition: "0.2s",
+        }}
+      >
+        <h4
+          style={{
+            fontSize: 17,
+            fontWeight: "bold",
+            marginBottom: 8,
+            color: "#111827",
+          }}
+        >
+          {campaign.campaign_name}
+        </h4>
+
+        <p style={{ fontSize: 13, color: "#374151" }}>
+          <strong>To:</strong> {campaign.to_email}
+        </p>
+
+        <p style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
+          Created:{" "}
+          {new Date(campaign.created_at).toLocaleDateString("en-IN")}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+/* ✅ Grid Style */
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 16,
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+};

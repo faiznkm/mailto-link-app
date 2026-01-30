@@ -5,7 +5,10 @@ export default async function ThankYouPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ name?: string; campaign?: string }>;
 }) {
+  const resolvedParams = await params;
   const resolvedSearch = await searchParams;
+
+  const slug = resolvedParams.slug;
 
   const name = resolvedSearch.name || "Friend";
   const campaign = resolvedSearch.campaign || "our campaign";
@@ -14,58 +17,65 @@ export default async function ThankYouPage({
     <main
       style={{
         minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
+        padding: "30px 16px",
         background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
       }}
     >
+      {/* Card */}
       <div
         style={{
           background: "white",
           borderRadius: 20,
-          padding: 30,
+          padding: "25px 20px",
           maxWidth: 420,
           width: "100%",
+          margin: "0 auto",
           textAlign: "center",
           boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
         }}
       >
         {/* 🎉 Icon */}
-        <div style={{ fontSize: 60 }}>🎉</div>
+        <div style={{ fontSize: 52, marginBottom: 8 }}>🎉</div>
 
         <h1
           style={{
-            fontSize: 26,
+            fontSize: 24,
             fontWeight: "bold",
-            marginTop: 10,
             color: "#111827",
+            marginBottom: 10,
           }}
         >
           Thank You, {name}!
         </h1>
 
-        <p style={{ marginTop: 12, fontSize: 16, color: "#374151" }}>
+        <p style={{ fontSize: 15, color: "#374151", lineHeight: 1.5 }}>
           Your participation in{" "}
           <strong>{campaign}</strong> means a lot.
         </p>
 
-        <p style={{ marginTop: 15, fontSize: 15, color: "#4b5563" }}>
+        <p
+          style={{
+            marginTop: 14,
+            fontSize: 14,
+            color: "#4b5563",
+            lineHeight: 1.5,
+          }}
+        >
           Your email application will open shortly.
           <br />
           Just click the <strong>Send</strong> button to complete your message.
         </p>
 
-        {/* Inspirational Message */}
+        {/* Motivation Box */}
         <div
           style={{
-            marginTop: 20,
-            padding: 15,
+            marginTop: 18,
+            padding: 14,
             borderRadius: 14,
-            background: "#f3f4f6",
-            fontSize: 15,
+            background: "#f9fafb",
+            fontSize: 14,
             color: "#111827",
+            lineHeight: 1.4,
           }}
         >
           ✊ Let our voice be heard.  
@@ -74,19 +84,20 @@ export default async function ThankYouPage({
 
         {/* Button */}
         <a
-          href="/"
+          href={`/${slug}`}
           style={{
             display: "inline-block",
-            marginTop: 25,
-            padding: "12px 20px",
+            marginTop: 22,
+            padding: "12px 18px",
             borderRadius: 12,
             background: "#111827",
             color: "white",
             fontWeight: "bold",
             textDecoration: "none",
+            fontSize: 14,
           }}
         >
-          Back to Home
+          📩 Send Once More
         </a>
       </div>
     </main>
