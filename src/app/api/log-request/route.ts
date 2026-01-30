@@ -22,27 +22,47 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Capture IP Address (Vercel-safe)
-    const forwardedFor = req.headers.get("x-forwarded-for") || "";
-    const ip = forwardedFor.split(",")[0]?.trim() || "unknown";
+    // ✅ Capture IP Address (Vercel + Local Safe)
+    const rawIp =
+      req.headers.get("x-forwarded-for") ||
+      req.headers.get("x-real-ip") ||
+      "";
+
+    const ip = rawIp.split(",")[0]?.trim() || "unknown";
 
     // ✅ Capture Device Info
     const userAgent = req.headers.get("user-agent") || "unknown";
 
     // ✅ Default location values
-    let city = null;
-    let region = null;
-    let country = null;
+    let city: string | null = null;
+    let region: string | null = null;
+    let country: string | null = null;
 
-    // ✅ Fetch Location by IP (Global)
+    // ✅ Fetch Location by IP
     if (ip !== "unknown") {
       try {
-        const geoRes = await fetch(`https://ipapi.co/${ip}/json/`);
-        const geoData = await geoRes.json();
+        const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, {
+          headers: {
+            // ipapi sometimes blocks requests without UA
+            "User-Agent": "Mozilla/5.0 (MailtoLinkApp)",
+          },
+        });
 
-        city = geoData.city || null;
-        region = geoData.region || null;
-        country = geoData.country_name || null;
+        // ✅ Check if request succeeded
+        if (!geoRes.ok) {
+          console.log("Geo API failed:", geoRes.status);
+        } else {
+          const geoData = await geoRes.json();
+
+          // ✅ ipapi error response handling
+          if (geoData.error) {
+            console.log("Geo lookup error:", geoData.reason);
+          } else {
+            city = geoData.city || null;
+            region = geoData.region || null;
+            country = geoData.country_name || null;
+          }
+        }
       } catch (geoError) {
         console.log("Geo lookup failed:", geoError);
       }
