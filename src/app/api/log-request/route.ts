@@ -66,7 +66,9 @@ export async function POST(req: Request) {
       } catch (geoError) {
         console.log("Geo lookup failed:", geoError);
       }
+
     }
+    console.log("Saving Location:", { city, region, country });
 
     // ✅ Insert into Supabase
     const { error } = await supabaseServer.from("email_requests").insert([
