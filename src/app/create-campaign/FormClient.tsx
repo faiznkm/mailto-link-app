@@ -17,10 +17,11 @@ export default function FormClient() {
   const router = useRouter();
 
   const [campaignName, setCampaignName] = useState("");
+  const [description, setDescription] = useState("");
+  
   const [slug, setSlug] = useState("");
   const [customDomain, setCustomDomain] = useState("");
-
-  const [description, setDescription] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
 
   const [toEmail, setToEmail] = useState("");
   const [ccEmail, setCcEmail] = useState("");
@@ -43,9 +44,10 @@ export default function FormClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         campaign_name: campaignName,
+        description,
         slug,
         custom_domain: customDomain,
-        description,
+        thumbnail_url: thumbnailUrl,
         to_email: toEmail,
         cc_email: ccEmail,
         subject,
@@ -120,7 +122,20 @@ export default function FormClient() {
           onChange={(e) => setCustomDomain(e.target.value)}
           style={styles.input}
         />
+
+        <label style={styles.label}>Thumbnail Image URL</label>
+        <input
+          placeholder="https://example.com/banner.png"
+          value={thumbnailUrl}
+          onChange={(e) => setThumbnailUrl(e.target.value)}
+          style={styles.input}
+        />
+
+        <p style={styles.helper}>
+          This image will appear when the link is shared on WhatsApp/Facebook.
+        </p>
       </div>
+
 
       {/* Section 3 */}
       <div style={styles.card}>

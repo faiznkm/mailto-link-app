@@ -1,6 +1,45 @@
 import CampaignFormClient from "./CampaignFormClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const resolvedParams = await params;
+  const slug = resolvedParams.slug;
+
+  const { data: campaign } = await supabaseAdmin
+    .from("email_campaigns")
+    .select("campaign_name, description, thumbnail_url")
+    .eq("slug", slug)
+    .single();
+
+  if (!campaign) {
+    return {
+      title: "Campaign Not Found",
+    };
+  }
+
+  return {
+    title: campaign.campaign_name,
+    description: campaign.description,
+
+    openGraph: {
+      title: campaign.campaign_name,
+      description: campaign.description,
+      images: [
+        {
+          url:
+            campaign.thumbnail_url ||
+            "https://xwvmwxgwfjykbshauxjq.supabase.co/storage/v1/object/public/thumbnails/default-thumbnail.png",
+        },
+      ],
+    },
+  };
+}
+
+
 export default async function CampaignPage({
   params,
 }: {
