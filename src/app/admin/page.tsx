@@ -1,445 +1,385 @@
-import Link from "next/link";
+import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-/* -------------------------------
-   Admin Dashboard Page
--------------------------------- */
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ password?: string }>;
-}) {
-  const resolvedSearch = await searchParams;
-  const password = resolvedSearch.password;
+import CampaignManagerClient from "./CampaignManagerClient";
+import AdminTableClient from "./AdminTableClient";
 
-  // ✅ Simple Password Protection
-  if (password !== process.env.ADMIN_PASSWORD) {
+export default async function AdminPage() {
+  /* ✅ Cookie Check */
+  const cookieStore = await cookies();
+  const isAdmin = cookieStore.get("admin_auth")?.value === "true";
+
+  if (!isAdmin) {
     return (
-      <main style={styles.center}>
-        <h1>Admin Access Denied</h1>
-        <p>Add ?password=YOUR_PASSWORD in the URL.</p>
+      <main style={styles.centerPage}>
+        <div style={styles.loginCard}>
+          <h1 style={styles.heading}>Admin Access Required</h1>
+          <p style={styles.subText}>
+            Please login to access the dashboard.
+          </p>
+
+          <a href="/admin/login" style={styles.primaryBtn}>
+            🔑 Go to Admin Login
+          </a>
+        </div>
       </main>
     );
   }
 
-  /* -------------------------------
-     Fetch Global Statistics
-  -------------------------------- */
-
-  // Total Campaigns
-  const { count: totalCampaigns } = await supabaseAdmin
+  /* -----------------------------
+     ✅ Fetch Campaigns
+  ------------------------------ */
+  const { data: campaigns } = await supabaseAdmin
     .from("email_campaigns")
-    .select("*", { count: "exact", head: true });
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  // Active Campaigns
-  const { count: activeCampaigns } = await supabaseAdmin
-    .from("email_campaigns")
-    .select("*", { count: "exact", head: true })
-    .eq("is_active", true);
-
-  // Total Emails Sent
-  const { count: totalEmails } = await supabaseAdmin
+  /* -----------------------------
+     ✅ Fetch Requests
+  ------------------------------ */
+  const { data: requests } = await supabaseAdmin
     .from("email_requests")
-    .select("*", { count: "exact", head: true });
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(500);
 
-  // Unique Visitors
-  const { data: uniqueVisitorsData } = await supabaseAdmin.rpc(
-    "unique_visitors_count"
-  );
+  const campaignList = campaigns || [];
+  const rows = requests || [];
 
-  const uniqueVisitors =
-    uniqueVisitorsData?.[0]?.unique_count || 0;
+  /* -----------------------------
+     ✅ GLOBAL STATISTICS
+  ------------------------------ */
+  const totalCampaigns = campaignList.length;
+  const activeCampaigns = campaignList.filter((c) => c.is_active).length;
 
-  /* -------------------------------
-     Insight Queries
-  -------------------------------- */
+  const totalEmails = rows.length;
+
+  const uniqueVisitors = new Set(rows.map((r) => r.visitor_id)).size;
+
+  /* -----------------------------
+     ✅ INSIGHTS
+  ------------------------------ */
+
+  // Emails per campaign
+  const campaignEmailCount: any = {};
+  rows.forEach((r) => {
+    campaignEmailCount[r.campaign_id] =
+      (campaignEmailCount[r.campaign_id] || 0) + 1;
+  });
 
   // Most Successful Campaigns
-  const { data: topCampaigns } = await supabaseAdmin.rpc(
-    "top_campaigns_with_counts"
-  );
+  const mostSuccessful = [...campaignList]
+    .map((c) => ({
+      ...c,
+      count: campaignEmailCount[c.id] || 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   // Recent Campaigns
-  const { data: recentCampaigns } = await supabaseAdmin.rpc(
-    "recent_campaigns_with_counts"
-  );
+  const recentCampaigns = [...campaignList].slice(0, 5);
 
-  // Top Countries
-  const { data: topCountries } = await supabaseAdmin.rpc(
-    "top_countries"
-  );
+  // Country counts
+  const countryCount: any = {};
+  rows.forEach((r) => {
+    if (r.country) {
+      countryCount[r.country] =
+        (countryCount[r.country] || 0) + 1;
+    }
+  });
 
-  // Top Cities
-  const { data: topCities } = await supabaseAdmin.rpc(
-    "top_cities"
-  );
+  const topCountries = Object.entries(countryCount)
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 5);
 
-  // Campaign Table Full Data
-  const { data: campaigns } = await supabaseAdmin.rpc(
-    "campaigns_table_with_counts"
-  );
+  // City counts
+  const cityCount: any = {};
+  rows.forEach((r) => {
+    if (r.city) {
+      cityCount[r.city] = (cityCount[r.city] || 0) + 1;
+    }
+  });
+
+  const topCities = Object.entries(cityCount)
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 5);
 
   return (
     <main style={styles.page}>
-      {/* HEADER */}
+      {/* ✅ HEADER */}
       <header style={styles.header}>
-        <h1 style={styles.brand}>Mailto Campaigns Admin</h1>
-
-        <div style={styles.headerButtons}>
-          <Link href="/create-campaign" style={styles.primaryBtn}>
-            ➕ Create Campaign
-          </Link>
-
-          <Link href="/" style={styles.logoutBtn}>
-            Logout
-          </Link>
+        <div>
+          <h1 style={styles.brand}>Mailto Campaigns</h1>
+          <p style={styles.tagline}>
+            Admin Dashboard — Campaign Insights & Analytics
+          </p>
         </div>
+
+        <form action="/api/admin-logout" method="POST">
+          <button style={styles.logoutBtn}>Logout</button>
+        </form>
       </header>
 
-      {/* GLOBAL STAT CARDS */}
+      {/* ✅ ACTION BUTTONS */}
+      <section style={styles.actionsRow}>
+        <a href="/create-campaign" style={styles.primaryBtn}>
+          ➕ Create Campaign
+        </a>
+
+        <a href="/api/export-csv" style={styles.secondaryBtn}>
+          ⬇ Export CSV
+        </a>
+      </section>
+
+      {/* ✅ GLOBAL STATS */}
       <section style={styles.statsGrid}>
-        <StatCard title="Total Campaigns" value={totalCampaigns || 0} />
-        <StatCard title="Active Campaigns" value={activeCampaigns || 0} />
-        <StatCard title="Total Emails Sent" value={totalEmails || 0} />
+        <StatCard title="Total Campaigns" value={totalCampaigns} />
+        <StatCard title="Active Campaigns" value={activeCampaigns} />
+        <StatCard title="Total Emails Sent" value={totalEmails} />
         <StatCard title="Unique Visitors" value={uniqueVisitors} />
       </section>
 
-      {/* INSIGHT GRID */}
+      {/* ✅ INSIGHTS GRID */}
       <section style={styles.insightGrid}>
-        <InsightCard
-          title="Most Successful Campaigns"
-          items={topCampaigns || []}
-        />
+        <InsightCard title="Most Successful Campaigns">
+          {mostSuccessful.map((c) => (
+            <p key={c.id} style={styles.insightItem}>
+              <b>{c.campaign_name}</b>
+              <br />
+              {new Date(c.created_at).toLocaleDateString()} —{" "}
+              {c.count} emails
+            </p>
+          ))}
+        </InsightCard>
 
-        <InsightCard
-          title="Recent Campaigns"
-          items={recentCampaigns || []}
-        />
+        <InsightCard title="Recent Campaigns">
+          {recentCampaigns.map((c) => (
+            <p key={c.id} style={styles.insightItem}>
+              <b>{c.campaign_name}</b>
+              <br />
+              {new Date(c.created_at).toLocaleDateString()}
+            </p>
+          ))}
+        </InsightCard>
 
-        <SimpleCountCard title="Top Countries" items={topCountries || []} />
+        <InsightCard title="Top Countries">
+          {topCountries.map(([country, count]) => (
+            <p key={country} style={styles.insightItem}>
+              {country} — <b>{Number(count)}</b>
+            </p>
+          ))}
+        </InsightCard>
 
-        <SimpleCountCard title="Top Cities" items={topCities || []} />
+        <InsightCard title="Top Cities">
+          {topCities.map(([city, count]) => (
+            <p key={city} style={styles.insightItem}>
+              {city} — <b>{Number(count)}</b>
+            </p>
+          ))}
+        </InsightCard>
       </section>
 
-      {/* CAMPAIGN TABLE */}
-      <section style={styles.tableSection}>
-        <h2 style={styles.sectionTitle}>All Campaigns</h2>
-
-        {/* Search + Export */}
-        <div style={styles.tableTools}>
-          <input
-            placeholder="Search campaigns..."
-            style={styles.searchInput}
-          />
-
-          <button style={styles.exportBtn}>
-            ⬇ Export CSV
-          </button>
-        </div>
-
-        {/* Table */}
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th>Sl</th>
-                <th>Title</th>
-                <th>Total Emails</th>
-                <th>Created</th>
-                <th>End Date</th>
-                <th>Slug</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {campaigns?.map((c: any, index: number) => (
-                <tr key={c.id}>
-                  <td>{index + 1}</td>
-
-                  {/* Title → Analysis Page */}
-                  <td>
-                    <Link
-                      href={`/admin/campaign/${c.id}?password=${password}`}
-                      style={styles.link}
-                    >
-                      {c.campaign_name}
-                    </Link>
-                  </td>
-
-                  <td>{c.total_emails}</td>
-
-                  <td>
-                    {new Date(c.created_at).toLocaleDateString("en-IN")}
-                  </td>
-
-                  <td>
-                    {c.end_date
-                      ? new Date(c.end_date).toLocaleDateString("en-IN")
-                      : "-"}
-                  </td>
-
-                  {/* Slug Link */}
-                  <td>
-                    <a
-                      href={`/${c.slug}`}
-                      target="_blank"
-                      style={styles.slugLink}
-                    >
-                      {c.slug}
-                    </a>
-                  </td>
-
-                  {/* Status */}
-                  <td>
-                    {c.is_active ? (
-                      <span style={styles.activeBadge}>Active</span>
-                    ) : (
-                      <span style={styles.closedBadge}>Closed</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* ✅ CAMPAIGN MANAGER */}
+      <section style={styles.sectionCard}>
+        <h2 style={styles.sectionTitle}>Campaign Manager</h2>
+        <CampaignManagerClient campaigns={campaignList} />
       </section>
 
-      {/* FOOTER */}
+      {/* ✅ EMAIL REQUEST TABLE */}
+      <section style={styles.sectionCard}>
+        <h2 style={styles.sectionTitle}>Email Requests</h2>
+        <AdminTableClient rows={rows} />
+      </section>
+
+      {/* Footer */}
       <footer style={styles.footer}>© yezhara.com</footer>
     </main>
   );
 }
 
-/* -------------------------------
-   Components
--------------------------------- */
+/* -----------------------------
+   ✅ Small Components
+------------------------------ */
 
 function StatCard({ title, value }: any) {
   return (
     <div style={styles.statCard}>
       <p style={styles.statTitle}>{title}</p>
-      <h3 style={styles.statValue}>{value}</h3>
+      <h2 style={styles.statValue}>{value}</h2>
     </div>
   );
 }
 
-function InsightCard({ title, items }: any) {
+function InsightCard({ title, children }: any) {
   return (
-    <div style={styles.insightCard}>
-      <h3 style={styles.cardTitle}>{title}</h3>
-
-      {items.slice(0, 5).map((x: any) => (
-        <p key={x.id} style={styles.itemRow}>
-          <strong>{x.campaign_name}</strong>
-          <br />
-          {new Date(x.created_at).toLocaleDateString("en-IN")} —{" "}
-          {x.total_emails} emails
-        </p>
-      ))}
+    <div style={styles.sectionCard}>
+      <h3 style={styles.sectionTitle}>{title}</h3>
+      {children}
     </div>
   );
 }
 
-function SimpleCountCard({ title, items }: any) {
-  return (
-    <div style={styles.insightCard}>
-      <h3 style={styles.cardTitle}>{title}</h3>
-
-      {items.slice(0, 5).map((x: any, i: number) => (
-        <p key={i} style={styles.itemRow}>
-          {x.name} — {x.count}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-/* -------------------------------
-   Styling
--------------------------------- */
+/* -----------------------------
+   ✅ Styles
+------------------------------ */
 
 const styles: any = {
   page: {
     minHeight: "100vh",
-    padding: 20,
-    background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
-    color: "white",
+    background: "#f9fafb",
+    padding: "25px 15px",
+    fontFamily: "system-ui, sans-serif",
   },
 
   header: {
+    maxWidth: 1100,
+    margin: "0 auto",
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 15,
     marginBottom: 25,
   },
 
   brand: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
-  },
-
-  headerButtons: {
-    display: "flex",
-    gap: 10,
-  },
-
-  primaryBtn: {
-    background: "white",
     color: "#111827",
-    padding: "10px 14px",
-    borderRadius: 10,
-    textDecoration: "none",
-    fontWeight: "bold",
+  },
+
+  tagline: {
+    fontSize: 14,
+    marginTop: 4,
+    color: "#6b7280",
   },
 
   logoutBtn: {
     background: "#111827",
     color: "white",
-    padding: "10px 14px",
-    borderRadius: 10,
+    padding: "10px 16px",
+    borderRadius: 12,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+
+  actionsRow: {
+    maxWidth: 1100,
+    margin: "0 auto 25px",
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+
+  primaryBtn: {
+    background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 14,
     textDecoration: "none",
+    fontWeight: "bold",
+  },
+
+  secondaryBtn: {
+    background: "white",
+    padding: "12px 18px",
+    borderRadius: 14,
+    textDecoration: "none",
+    fontWeight: "bold",
+    border: "1px solid #e5e7eb",
+    color: "#111827",
   },
 
   statsGrid: {
+    maxWidth: 1100,
+    margin: "0 auto 25px",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 15,
-    marginBottom: 25,
   },
 
   statCard: {
     background: "white",
-    color: "#111827",
-    padding: 16,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: 18,
+    boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
   },
 
   statTitle: {
     fontSize: 13,
     color: "#6b7280",
+    marginBottom: 6,
   },
 
   statValue: {
     fontSize: 24,
     fontWeight: "bold",
-    marginTop: 6,
+    color: "#111827",
   },
 
   insightGrid: {
+    maxWidth: 1100,
+    margin: "0 auto 25px",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
     gap: 15,
-    marginBottom: 30,
   },
 
-  insightCard: {
-    background: "white",
-    color: "#111827",
-    padding: 16,
-    borderRadius: 16,
-  },
-
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-
-  itemRow: {
+  insightItem: {
     fontSize: 13,
-    marginBottom: 10,
     color: "#374151",
+    marginBottom: 10,
   },
 
-  tableSection: {
+  sectionCard: {
     background: "white",
+    padding: 20,
     borderRadius: 18,
-    padding: 18,
-    color: "#111827",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
   },
 
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
     marginBottom: 12,
-  },
-
-  tableTools: {
-    display: "flex",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 12,
-  },
-
-  searchInput: {
-    padding: 10,
-    borderRadius: 10,
-    border: "1px solid #ddd",
-    flex: 1,
-    minWidth: 180,
-  },
-
-  exportBtn: {
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "none",
-    cursor: "pointer",
-    background: "#4f46e5",
-    color: "white",
-    fontWeight: "bold",
-  },
-
-  tableWrap: {
-    overflowX: "auto",
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 13,
-  },
-
-  link: {
-    color: "#2563eb",
-    fontWeight: "bold",
-    textDecoration: "none",
-  },
-
-  slugLink: {
     color: "#111827",
-    textDecoration: "underline",
-  },
-
-  activeBadge: {
-    background: "#dcfce7",
-    color: "#166534",
-    padding: "4px 10px",
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-
-  closedBadge: {
-    background: "#fee2e2",
-    color: "#991b1b",
-    padding: "4px 10px",
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: "bold",
   },
 
   footer: {
-    marginTop: 40,
     textAlign: "center",
-    opacity: 0.85,
+    marginTop: 40,
     fontSize: 13,
+    color: "#6b7280",
   },
 
-  center: {
-    padding: 50,
+  centerPage: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#f9fafb",
+    padding: 20,
+  },
+
+  loginCard: {
+    background: "white",
+    padding: 30,
+    borderRadius: 18,
     textAlign: "center",
+    maxWidth: 400,
+    width: "100%",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+  },
+
+  heading: {
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+
+  subText: {
+    marginTop: 10,
+    color: "#6b7280",
+    marginBottom: 20,
   },
 };
