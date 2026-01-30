@@ -3,7 +3,7 @@ import { supabaseServer } from "../../../lib/supabaseServer";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, place, email } = body;
+    const { campaign_id, name, place, email } = body;
 
     // ✅ Required validation
     if (!name || !place || !email) {
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
     // ✅ Insert into Supabase
     const { error } = await supabaseServer.from("email_requests").insert([
       {
+        campaign_id,
         name,
         place,
         email,

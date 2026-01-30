@@ -1,122 +1,114 @@
-"use client";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { cookies } from "next/headers";
 
-import { useState } from "react";
+export default async function HomePage() {
+  // Check admin login cookie
+  const cookieStore = await cookies();
+  const isAdmin = cookieStore.get("admin_auth")?.value === "true";
 
-export default function HomePage() {
-  const [name, setName] = useState("");
-  const [place, setPlace] = useState("");
-  const [email, setEmail] = useState("");
+  // Fetch all campaigns
+  const { data: campaigns } = await supabaseAdmin
+    .from("email_campaigns")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    const form = e.currentTarget;
-
-    // ✅ Trigger browser built-in validation popup
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
-
-    // ✅ Strict Email Validation (must include dot after domain)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-      alert("Please enter a valid email (example: name@gmail.com)");
-      return;
-    }
-
-    // ✅ Log request into Supabase
-    const res = await fetch("/api/log-request", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name, place, email }),
-    });
-
-    if (!res.ok) {
-      alert("Logging failed. Please try again.");
-      return;
-    }
-
-    // ✅ Open Mail App with Dynamic Content
-    const subject = encodeURIComponent("Mail Request from " + name);
-
-    const bodyText = encodeURIComponent(
-      `Hello,\n\nMy name is ${name} from ${place}.\n\nMy email is: ${email}\n\nThank you.`
-    );
-
-    window.location.href =
-      `mailto:test@example.com?subject=${subject}&body=${bodyText}`;
-  }
+  const today = new Date().toISOString().split("T")[0];
 
   return (
-    <main style={{ padding: 40 }}>
-      <h1 style={{ fontSize: 28, fontWeight: "bold" }}>
-        Dynamic Mailto Logger App
+    <main style={{ padding: 50 }}>
+      <h1 style={{ fontSize: 32, fontWeight: "bold" }}>
+        Mail Campaign Link Generator
       </h1>
 
       <p style={{ marginTop: 10 }}>
-        Fill in your details and click Send. Your request will be logged into
-        Supabase before opening your mail app.
+        Create campaigns and share unique links for users to send emails easily.
       </p>
 
-      <form onSubmit={handleSubmit} style={{ marginTop: 30 }}>
-        {/* Name */}
-        <input
-          placeholder="Enter your name"
-          value={name}
-          required
-          onChange={(e) => setName(e.target.value)}
+      {/* Admin Create Button */}
+      {isAdmin && (
+        <a
+          href="/create-campaign"
           style={{
-            padding: 10,
-            width: 320,
-            display: "block",
-            marginBottom: 15,
-          }}
-        />
-
-        {/* Email */}
-        <input
-          type="email"
-          placeholder="Enter your email (required)"
-          value={email}
-          required
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            padding: 10,
-            width: 320,
-            display: "block",
-            marginBottom: 15,
-          }}
-        />
-
-        {/* Place */}
-        <input
-          placeholder="Enter your place"
-          value={place}
-          required
-          onChange={(e) => setPlace(e.target.value)}
-          style={{
-            padding: 10,
-            width: 320,
-            display: "block",
-            marginBottom: 20,
-          }}
-        />
-
-        <button
-          type="submit"
-          style={{
-            padding: "10px 20px",
-            cursor: "pointer",
+            display: "inline-block",
+            marginTop: 20,
+            padding: "12px 18px",
+            background: "black",
+            color: "white",
+            borderRadius: 8,
+            textDecoration: "none",
             fontWeight: "bold",
           }}
         >
-          Send Email
-        </button>
-      </form>
+          ➕ Create New Campaign
+        </a>
+      )}
+
+      {/* Campaign List */}
+      <h2 style={{ marginTop: 40, fontSize: 22 }}>
+        Available Campaigns
+      </h2>
+
+      {!campaigns || campaigns.length === 0 ? (
+        <p style={{ marginTop: 20 }}>No campaigns created yet.</p>
+      ) : (
+        <div style={{ marginTop: 20 }}>
+          {campaigns.map((c) => {
+            // Status logic
+            let status = "Active";
+
+            if (!c.is_active) status = "Inactive";
+            else if (today < c.start_date) status = "Upcoming";
+            else if (today > c.end_date) status = "Expired";
+
+            return (
+              <div
+                key={c.id}
+                style={{
+                  padding: 15,
+                  border: "1px solid #ddd",
+                  borderRadius: 10,
+                  marginBottom: 15,
+                }}
+              >
+                <h3 style={{ fontSize: 18, fontWeight: "bold" }}>
+                  {c.campaign_name}
+                </h3>
+
+                <p style={{ marginTop: 5 }}>
+                  Link:{" "}
+                  <a
+                    href={`/${c.slug}`}
+                    target="_blank"
+                    style={{ textDecoration: "underline" }}
+                  >
+                    /{c.slug}
+                  </a>
+                </p>
+
+                <p style={{ marginTop: 5 }}>
+                  Status:{" "}
+                  <b
+                    style={{
+                      color:
+                        status === "Active"
+                          ? "green"
+                          : status === "Inactive"
+                          ? "gray"
+                          : "red",
+                    }}
+                  >
+                    {status}
+                  </b>
+                </p>
+
+                <p style={{ marginTop: 5, fontSize: 13 }}>
+                  Start: {c.start_date} | End: {c.end_date}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }

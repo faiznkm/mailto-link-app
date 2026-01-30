@@ -1,30 +1,37 @@
+import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import AdminTableClient from "./AdminTableClient";
+import CampaignManagerClient from "./CampaignManagerClient";
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: { password?: string };
-}) {
-  const password = searchParams.password;
+export default async function AdminPage() {
+  // ✅ Cookie Check
+  const cookieStore = await cookies();
+  const isAdmin = cookieStore.get("admin_auth")?.value === "true";
 
-  // ✅ Simple Password Protection
-  if (password !== process.env.ADMIN_PASSWORD) {
+  // ❌ If not logged in → show login link
+  if (!isAdmin) {
     return (
       <main style={{ padding: 40 }}>
-        <h1>Admin Access Denied</h1>
+        <h1>Not Logged In</h1>
         <p>
-          Add <code>?password=YOUR_PASSWORD</code> in the URL.
+          Please login at{" "}
+          <a href="/admin/login">/admin/login</a>
         </p>
       </main>
     );
   }
 
-  // ✅ Fetch latest 50 requests
+  const { data: campaigns } = await supabaseAdmin
+    .from("email_campaigns")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  // ✅ Fetch records
   const { data, error } = await supabaseAdmin
     .from("email_requests")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(500);
 
   if (error) {
     return (
@@ -35,49 +42,47 @@ export default async function AdminPage({
     );
   }
 
+  const rows = data || [];
+
   return (
     <main style={{ padding: 40 }}>
       <h1 style={{ fontSize: 28, fontWeight: "bold" }}>
         Admin Dashboard
       </h1>
 
-      <p style={{ marginTop: 10 }}>
-        Showing last 50 email requests.
-      </p>
+      {/* Logout Button */}
+      <form action="/api/admin-logout" method="POST">
+        <button
+          style={{
+            marginTop: 15,
+            padding: "8px 15px",
+            cursor: "pointer",
+          }}
+        >
+          Logout
+        </button>
+      </form>
 
-      <table
-        border={1}
-        cellPadding={10}
-        style={{ marginTop: 20, width: "100%", fontSize: 14 }}
+      <CampaignManagerClient campaigns={campaigns || []} />
+
+      {/* CSV Export */}
+      <a
+        href="/api/export-csv"
+        style={{
+          display: "inline-block",
+          marginTop: 15,
+          padding: "10px 15px",
+          border: "1px solid black",
+          borderRadius: 8,
+          textDecoration: "none",
+          fontWeight: "bold",
+        }}
       >
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Place</th>
-            <th>City</th>
-            <th>Country</th>
-            <th>IP</th>
-            <th>Date</th>
-          </tr>
-        </thead>
+        ⬇ Download CSV Export
+      </a>
 
-        <tbody>
-          {data?.map((row) => (
-            <tr key={row.id}>
-              <td>{row.name}</td>
-              <td>{row.email}</td>
-              <td>{row.place}</td>
-              <td>{row.city}</td>
-              <td>{row.country}</td>
-              <td>{row.ip_address}</td>
-              <td>
-                {new Date(row.created_at).toLocaleString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* Table Client */}
+      <AdminTableClient rows={rows} />
     </main>
   );
 }
