@@ -18,6 +18,26 @@ function detectOS(ua: string) {
   return "Unknown";
 }
 
+/* ✅ Detect Traffic Source Automatically */
+function detectTrafficSource(ua: string) {
+  const userAgent = ua.toLowerCase();
+
+  if (userAgent.includes("whatsapp")) return "whatsapp";
+  if (userAgent.includes("instagram")) return "instagram";
+
+  // Facebook in-app browsers
+  if (userAgent.includes("fban") || userAgent.includes("fbav"))
+    return "facebook";
+
+  if (userAgent.includes("twitter")) return "twitter";
+  if (userAgent.includes("telegram")) return "telegram";
+
+  // Android WebView
+  if (userAgent.includes("wv")) return "android-webview";
+
+  return "direct";
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -69,6 +89,9 @@ export async function POST(req: Request) {
     const browser = detectBrowser(userAgent);
     const os = detectOS(userAgent);
 
+    // ✅ Auto Traffic Source Detection
+    const trafficSource = detectTrafficSource(userAgent);
+
     // ✅ Vercel Geo Headers (Works Only in Production)
     const country = req.headers.get("x-vercel-ip-country") || null;
     const region = req.headers.get("x-vercel-ip-country-region") || null;
@@ -82,6 +105,7 @@ export async function POST(req: Request) {
       device_type,
       browser,
       os,
+      trafficSource,
     });
 
     // ✅ Insert into Supabase
@@ -101,6 +125,9 @@ export async function POST(req: Request) {
         screen_height,
         language,
         referrer,
+
+        // ✅ NEW FIELD
+        traffic_source: trafficSource,
 
         ip_address: ip,
         user_agent: userAgent,

@@ -104,6 +104,13 @@ export default function CampaignFormClient({
       `mailto:${campaign.to_email}` +
       `?subject=${subject}` +
       `&body=${bodyText}`;
+    
+    // ✅ Redirect to Thank You Page after short delay
+    setTimeout(() => {
+      window.location.href = `/${campaign.slug}/thanks?name=${encodeURIComponent(
+        name
+      )}&campaign=${encodeURIComponent(campaign.campaign_name)}`;
+    }, 1200);
   }
 
   return (
