@@ -107,9 +107,15 @@ export default function CampaignFormClient({
     
     // ✅ Redirect to Thank You Page after short delay
     setTimeout(() => {
-      window.location.href = `/${campaign.slug}/thanks?name=${encodeURIComponent(
-        name
-      )}&campaign=${encodeURIComponent(campaign.campaign_name)}`;
+      window.location.href =
+        `/${campaign.slug}/thanks?` +
+        `name=${encodeURIComponent(name)}` +
+        `&campaign=${encodeURIComponent(campaign.campaign_name)}` +
+        `&to=${encodeURIComponent(campaign.to_email)}` +
+        `&subject=${encodeURIComponent(campaign.subject)}` +
+        `&body=${encodeURIComponent(
+          `${campaign.body}\n\nName: ${name}\nPlace: ${place}\nEmail: ${email}`
+        )}`;
     }, 1200);
   }
 
